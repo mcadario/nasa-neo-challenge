@@ -23,7 +23,7 @@ FEED_ADDON = "feed?"
 LOOKUP_ADDON = "neo/"
 BROWSE_ADDON = "browse"
 NEOWS_API_KEY = os.getenv("NASA_API_KEY", "DEMO_KEY")
-API_KEY_ADDON = f"api_key=xT5YNApZWjXKWov6NTJB4RWjzuh9jN4LLILliC1l"
+API_KEY_ADDON = f"api_key={NEOWS_API_KEY}"
 CACHE_TTL = 86400 # impostato ad 1 giorno per developing
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
