@@ -13,8 +13,7 @@ import { getBrowse } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
 import type { BrowseResponse } from "@/lib/types";
 import { useRouter } from "next/navigation";
-
-const PAGE_SIZE = 20;
+import { FilterBtn } from "@/components/filter-btn";
 
 export default function BrowsePage() {
   const router = useRouter();
@@ -23,6 +22,8 @@ export default function BrowsePage() {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "hazardous">("all");
   const [currentPage, setCurrentPage] = useState(1);
+
+  const PAGE_SIZE = 20
 
   async function handleBrowse() {
     setLoading(true);
@@ -79,7 +80,7 @@ export default function BrowsePage() {
           </p>
         )}
       </div>
-
+      
       {/* error */}
       {error && (
         <Alert variant="destructive">
@@ -153,7 +154,7 @@ export default function BrowsePage() {
           </div>
 
           {/* pagination */}
-          {totalPages > 1 && (
+          {(
             <div className="flex items-center justify-between">
               <p className="text-xs text-muted-foreground">
                 Page {currentPage} of {totalPages} — showing {paged.length} of {filtered.length}
@@ -189,20 +190,5 @@ export default function BrowsePage() {
         </div>
       )}
     </div>
-  );
-}
-
-function FilterBtn({
-  active, onClick, children,
-}: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`rounded px-3 py-1 text-xs font-medium transition-colors ${
-        active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-      }`}
-    >
-      {children}
-    </button>
   );
 }

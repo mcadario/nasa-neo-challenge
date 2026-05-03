@@ -9,7 +9,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AsteroidCard } from "@/components/asteroid-card";
 import { getFeed } from "@/lib/api";
-import type { FeedResponse } from "@/lib/types";
+import type { Asteroid, FeedResponse } from "@/lib/types";
+import { FilterBtn } from "@/components/filter-btn";
+
 
 function SkeletonGrid() {
   return (
@@ -31,6 +33,7 @@ export default function FeedPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [source, setSource] = useState<string | null>(null);
+  const [filter, setFilter] = useState<"all" | "hazardous" | "safe">("all");
 
   async function handleFetch() {
     setError(null);
@@ -52,7 +55,17 @@ export default function FeedPage() {
   }
 
   const dateEntries = data
-    ? Object.entries(data.near_earth_objects).sort(([a], [b]) => a.localeCompare(b))
+    ? Object.entries(data.near_earth_objects)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([date, asteroids]): [string, Asteroid[]] => [
+          date,
+          asteroids.filter((a) => {
+            if (filter === "hazardous") return a.is_potentially_hazardous_asteroid;
+            if (filter === "safe") return !a.is_potentially_hazardous_asteroid;
+            return true;
+          }),
+        ])
+        .filter(([, asteroids]) => asteroids.length > 0)
     : [];
 
   const totalHazardous = data
@@ -95,6 +108,21 @@ export default function FeedPage() {
           {loading ? "Fetching…" : "Search"}
         </Button>
       </div>
+
+      {/*filters */}
+      {data && ( // solo se la data è disponibile
+        <div className="flex items-center gap-1 rounded-md border border-border p-1 w-fit">
+          <FilterBtn active={filter === "all"} onClick={() => setFilter("all")}>
+            All ({data.element_count})
+          </FilterBtn>
+          <FilterBtn active={filter === "hazardous"} onClick={() => setFilter("hazardous")}>
+            Hazardous ({totalHazardous})
+          </FilterBtn>
+          <FilterBtn active={filter === "safe"} onClick={() => setFilter("safe")}>
+            Safe ({data.element_count - totalHazardous})
+          </FilterBtn>
+        </div>
+      )}
 
       {/* error */}
       {error && (
