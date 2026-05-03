@@ -33,8 +33,13 @@ export default function FeedPage() {
   const [source, setSource] = useState<string | null>(null);
 
   async function handleFetch() {
-    setLoading(true);
     setError(null);
+    if (endDate < startDate) {
+      setError("Controllare correttezza ordine tra prima e seconda data.");
+      return;
+    }
+
+    setLoading(true);
     try {
       const res = await getFeed(startDate, endDate);
       setData(res);
@@ -61,7 +66,7 @@ export default function FeedPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">NEO Feed</h1>
         <p className="text-muted-foreground mt-1">
-          Near Earth Objects for a date range (max 7 days).
+          Inserisci range di ricerca.
         </p>
       </div>
 
