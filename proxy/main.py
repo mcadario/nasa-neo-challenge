@@ -34,9 +34,8 @@ logger = logging.getLogger(__name__)
 #caching helpers
 """ formato key:
         feed: f_YYYY-MM-DD_YYYY-MM-DD, geenrata solo se le date sono impostate
-        lookup: l_0000000
-        browse: b, browse non cambia spesso e non devono essere salvate caratteristiche della query, 
-                "b" sarà l'unica chiave necessaria
+        lookup: l_0000000, 000000 è l'id asteroide
+        browse: b_0, 0 rappresenta il numero di pagina
 """
 
 def get_from_cache(key: str) -> dict | None:
@@ -113,9 +112,10 @@ def neows_lookup(asteroid_id:int = None):
     
     return data_lookup
 
-def neows_browse():
-    url = NEOWS_URL_BASE + LOOKUP_ADDON + BROWSE_ADDON + "?" + API_KEY_ADDON
-    key = "b"
+def neows_browse(page:int = 0): #https://api.nasa.gov/neo/rest/v1/neo/browse?api_key=API_KEY&page=0
+    url = NEOWS_URL_BASE + LOOKUP_ADDON + BROWSE_ADDON + "?" + API_KEY_ADDON + f"&page={page}" 
+    print(f"\t\t\tPAGE >>>>>>>>>>>>>>> {page}")
+    key = f"b_{page}"
 
     cache_response = get_from_cache(key)
     if cache_response: return cache_response
@@ -147,6 +147,6 @@ async def feed(sdate: str = None, edate: str = None):
 async def lookup(a_id: int = None):
     return neows_lookup(a_id)
 
-@app.get("/browse/") # example: http://localhost:8000/browse/
-async def browse():
-    return neows_browse()
+@app.get("/browse/") # example: http://localhost:8000/browse/?page=1
+async def browse(page: int = 10):
+    return neows_browse(page)

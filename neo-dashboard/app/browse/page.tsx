@@ -23,15 +23,15 @@ export default function BrowsePage() {
   const [filter, setFilter] = useState<"all" | "hazardous">("all");
   const [currentPage, setCurrentPage] = useState(1);
 
-  const PAGE_SIZE = 20
+  const PAGE_SIZE = 20 // di default chiamate api nasa ritornano 20 elementi per pagina
 
-  async function handleBrowse() {
+  async function handleBrowse(page=0) {
     setLoading(true);
     setError(null);
     try {
-      const res = await getBrowse();
+      const res = await getBrowse(page);
       setData(res);
-      setCurrentPage(1);
+      setCurrentPage(page);
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -44,8 +44,8 @@ export default function BrowsePage() {
     filter === "hazardous"
       ? allAsteroids.filter((a) => a.is_potentially_hazardous_asteroid)
       : allAsteroids;
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-  const paged = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const paged = filtered;
+  const totalPages = data?.page.total_pages ?? 0;
 
   return (
     <div className="space-y-6">
@@ -58,7 +58,7 @@ export default function BrowsePage() {
 
       {/* controls */}
       <div className="flex flex-wrap items-center gap-3">
-        <Button onClick={handleBrowse} disabled={loading} className="gap-2">
+        <Button onClick={() => handleBrowse()/* parti sempre da page=0 (prima pagina) */} disabled={loading} className="gap-2">
           <List className="h-4 w-4" />
           {loading ? "Loading…" : data ? "Refresh" : "Load all NEOs"}
         </Button>
@@ -157,22 +157,22 @@ export default function BrowsePage() {
           {(
             <div className="flex items-center justify-between">
               <p className="text-xs text-muted-foreground">
-                Page {currentPage} of {totalPages} — showing {paged.length} of {filtered.length}
+                Page {currentPage+1} of {totalPages} — showing {paged.length} of {filtered.length}
               </p>
               <div className="flex gap-2">
                 <Button
                   variant="outline"
                   size="sm"
-                  disabled={currentPage === 1}
-                  onClick={() => setCurrentPage((p) => p - 1)}
+                  disabled={currentPage === 0}
+                  onClick={() => handleBrowse(currentPage-1)} //indietro una pag
                 >
                   Previous
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  disabled={currentPage === totalPages}
-                  onClick={() => setCurrentPage((p) => p + 1)}
+                  disabled={currentPage >= totalPages-1}
+                  onClick={() => handleBrowse(currentPage+1)} //avanti una pag
                 >
                   Next
                 </Button>

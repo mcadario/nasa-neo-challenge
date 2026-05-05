@@ -2,6 +2,7 @@
 node_modules/
 .next/
 .env.local
+TODO.txt
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

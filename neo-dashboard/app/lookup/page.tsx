@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Search, AlertCircle, ExternalLink, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getLookup } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
 import type { Asteroid } from "@/lib/types";
+import { useSearchParams } from "next/navigation";
+
 
 const EXAMPLE_IDS = ["3542519", "2465633", "54016034", "3758838"];
 
@@ -19,6 +21,13 @@ export default function LookupPage() {
   const [data, setData] = useState<Asteroid | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    const id = searchParams.get("id");
+    if (id) handleLookup(id);/* id è nei parametri di ricerca solo se si accede alla pagina
+                                "lookup" cliccando su un asteroide su browse */
+  }, []);
 
   async function handleLookup(id?: string) {
     const target = id ?? asteroidId;
