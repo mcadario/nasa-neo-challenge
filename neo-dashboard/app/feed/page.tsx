@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { format, subDays } from "date-fns";
-import { Search, Calendar, AlertCircle } from "lucide-react";
+import { Search, Calendar, AlertCircle, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -11,7 +11,8 @@ import { AsteroidCard } from "@/components/asteroid-card";
 import { getFeed } from "@/lib/api";
 import type { Asteroid, FeedResponse } from "@/lib/types";
 import { FilterBtn } from "@/components/filter-btn";
-
+import { NeoSortPanel, DEFAULT_SORT, type SortState } from "@/components/neo-sort";
+import { sortAsteroids } from "@/lib/utils";
 
 function SkeletonGrid() {
   return (
@@ -34,6 +35,7 @@ export default function FeedPage() {
   const [error, setError] = useState<string | null>(null);
   const [source, setSource] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "hazardous" | "safe">("all");
+  const [sort, setSort] = useState<SortState>(DEFAULT_SORT);
 
   async function handleFetch() {
     setError(null);
@@ -41,7 +43,6 @@ export default function FeedPage() {
       setError("Controllare correttezza ordine tra prima e seconda data.");
       return;
     }
-
     setLoading(true);
     try {
       const res = await getFeed(startDate, endDate);
@@ -54,7 +55,34 @@ export default function FeedPage() {
     }
   }
 
-  const dateEntries = data
+  function resetSort() {
+    setSort(DEFAULT_SORT);
+  }
+
+  // tutti gli asteroidi flat, filtrati per hazardous/safe
+  const allAsteroids: Asteroid[] = data
+    ? Object.values(data.near_earth_objects)
+        .flat()
+        .filter((a) => {
+          if (filter === "hazardous") return a.is_potentially_hazardous_asteroid;
+          if (filter === "safe") return !a.is_potentially_hazardous_asteroid;
+          return true;
+        })
+    : [];
+
+  const totalHazardous = data
+    ? Object.values(data.near_earth_objects)
+        .flat()
+        .filter((a) => a.is_potentially_hazardous_asteroid).length
+    : 0;
+
+  // se un ordinamento è attivo → lista flat ordinata
+  // altrimenti → divisione per data
+  const isSorting = sort.key !== null;
+
+  const sortedFlat = isSorting ? sortAsteroids(allAsteroids, sort) : [];
+
+  const dateEntries = !isSorting && data
     ? Object.entries(data.near_earth_objects)
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([date, asteroids]): [string, Asteroid[]] => [
@@ -68,25 +96,19 @@ export default function FeedPage() {
         .filter(([, asteroids]) => asteroids.length > 0)
     : [];
 
-  const totalHazardous = data
-    ? Object.values(data.near_earth_objects)
-        .flat()
-        .filter((a) => a.is_potentially_hazardous_asteroid).length
-    : 0;
-
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">NEO Feed</h1>
-        <p className="text-muted-foreground mt-1">
-          Inserisci range di ricerca.
-        </p>
+        <p className="text-muted-foreground mt-1">Inserisci range di ricerca.</p>
       </div>
 
-      {/* controls */}
+      {/* date controls */}
       <div className="flex flex-wrap items-end gap-3">
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Start date</label>
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            Start date
+          </label>
           <Input
             type="date"
             value={startDate}
@@ -95,7 +117,9 @@ export default function FeedPage() {
           />
         </div>
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">End date</label>
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            End date
+          </label>
           <Input
             type="date"
             value={endDate}
@@ -109,18 +133,37 @@ export default function FeedPage() {
         </Button>
       </div>
 
-      {/*filters */}
-      {data && ( // solo se la data è disponibile
-        <div className="flex items-center gap-1 rounded-md border border-border p-1 w-fit">
-          <FilterBtn active={filter === "all"} onClick={() => setFilter("all")}>
-            All ({data.element_count})
-          </FilterBtn>
-          <FilterBtn active={filter === "hazardous"} onClick={() => setFilter("hazardous")}>
-            Hazardous ({totalHazardous})
-          </FilterBtn>
-          <FilterBtn active={filter === "safe"} onClick={() => setFilter("safe")}>
-            Safe ({data.element_count - totalHazardous})
-          </FilterBtn>
+      {/* filters + sort — visibili solo dopo la prima ricerca */}
+      {data && (
+        <div className="space-y-3">
+          {/* hazardous / safe */}
+          <div className="flex items-center gap-1 rounded-md border border-border p-1 w-fit">
+            <FilterBtn active={filter === "all"} onClick={() => setFilter("all")}>
+              All ({data.element_count})
+            </FilterBtn>
+            <FilterBtn active={filter === "hazardous"} onClick={() => setFilter("hazardous")}>
+              Hazardous ({totalHazardous})
+            </FilterBtn>
+            <FilterBtn active={filter === "safe"} onClick={() => setFilter("safe")}>
+              Safe ({data.element_count - totalHazardous})
+            </FilterBtn>
+          </div>
+
+          {/* sort + reset button */}
+          <div className="flex flex-wrap items-center gap-3">
+            <NeoSortPanel sort={sort} onChange={setSort} />
+            {isSorting && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={resetSort}
+                className="gap-1.5 text-xs"
+              >
+                <X className="h-3 w-3" />
+                Torna alla divisione per data
+              </Button>
+            )}
+          </div>
         </div>
       )}
 
@@ -142,20 +185,24 @@ export default function FeedPage() {
           {/* summary bar */}
           <div className="flex flex-wrap gap-6 rounded-lg border border-border bg-card p-4">
             <Metric label="Total objects" value={data.element_count} />
-            <Metric label="Days" value={dateEntries.length} />
+            <Metric label="Days" value={Object.keys(data.near_earth_objects).length} />
             <Metric label="Potentially hazardous" value={totalHazardous} danger={totalHazardous > 0} />
             {source && (
-              <Metric
-                label="Source"
-                value={source.toUpperCase()}
-                mono
-                dimmed={source === "cache"}
-              />
+              <Metric label="Source" value={source.toUpperCase()} mono dimmed={source === "cache"} />
             )}
           </div>
 
-          {/* grouped by date */}
-          {dateEntries.map(([date, asteroids]) => (
+          {/* vista flat ordinata — quando un sort è attivo */}
+          {isSorting && (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {sortedFlat.map((asteroid) => (
+                <AsteroidCard key={asteroid.id} asteroid={asteroid} />
+              ))}
+            </div>
+          )}
+
+          {/* vista raggruppata per data — quando nessun sort è attivo */}
+          {!isSorting && dateEntries.map(([date, asteroids]) => (
             <section key={date} className="space-y-3">
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-muted-foreground" />

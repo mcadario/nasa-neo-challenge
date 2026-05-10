@@ -10,10 +10,11 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { getBrowse } from "@/lib/api";
-import { formatNumber } from "@/lib/utils";
+import { formatNumber, sortAsteroids } from "@/lib/utils";
 import type { BrowseResponse } from "@/lib/types";
 import { useRouter } from "next/navigation";
 import { FilterBtn } from "@/components/filter-btn";
+import { NeoSortPanel, DEFAULT_SORT, type SortState } from "@/components/neo-sort";
 
 export default function BrowsePage() {
   const router = useRouter();
@@ -21,11 +22,12 @@ export default function BrowsePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "hazardous">("all");
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [sort, setSort] = useState<SortState>(DEFAULT_SORT);
 
-  const PAGE_SIZE = 20 // di default chiamate api nasa ritornano 20 elementi per pagina
+  const PAGE_SIZE = 20; // di default chiamate api nasa ritornano 20 elementi per pagina
 
-  async function handleBrowse(page=0) {
+  async function handleBrowse(page = 0) {
     setLoading(true);
     setError(null);
     try {
@@ -40,11 +42,16 @@ export default function BrowsePage() {
   }
 
   const allAsteroids = data?.near_earth_objects ?? [];
-  const filtered =
+
+  // 1. filtra per hazardous/safe
+  const byHazardous =
     filter === "hazardous"
       ? allAsteroids.filter((a) => a.is_potentially_hazardous_asteroid)
       : allAsteroids;
-  const paged = filtered;
+
+  // 2. ordina
+  const paged = sortAsteroids(byHazardous, sort);
+
   const totalPages = data?.page.total_pages ?? 0;
 
   return (
@@ -58,21 +65,14 @@ export default function BrowsePage() {
 
       {/* controls */}
       <div className="flex flex-wrap items-center gap-3">
-        <Button onClick={() => handleBrowse()/* parti sempre da page=0 (prima pagina) */} disabled={loading} className="gap-2">
+        <Button
+          onClick={() => handleBrowse()} /* parti sempre da page=0 (prima pagina) */
+          disabled={loading}
+          className="gap-2"
+        >
           <List className="h-4 w-4" />
           {loading ? "Loading…" : data ? "Refresh" : "Load all NEOs"}
         </Button>
-
-        {data && (
-          <div className="flex items-center gap-1 rounded-md border border-border p-1">
-            <FilterBtn active={filter === "all"} onClick={() => { setFilter("all"); setCurrentPage(1); }}>
-              All ({allAsteroids.length})
-            </FilterBtn>
-            <FilterBtn active={filter === "hazardous"} onClick={() => { setFilter("hazardous"); setCurrentPage(1); }}>
-              Hazardous ({allAsteroids.filter(a => a.is_potentially_hazardous_asteroid).length})
-            </FilterBtn>
-          </div>
-        )}
 
         {data && (
           <p className="ml-auto text-xs text-muted-foreground font-mono">
@@ -80,7 +80,24 @@ export default function BrowsePage() {
           </p>
         )}
       </div>
-      
+
+      {/* filters + sort — visibili solo dopo il caricamento */}
+      {data && (
+        <div className="space-y-3">
+          {/* hazardous / safe */}
+          <div className="flex items-center gap-1 rounded-md border border-border p-1 w-fit">
+            <FilterBtn active={filter === "all"} onClick={() => setFilter("all")}>
+              All ({allAsteroids.length})
+            </FilterBtn>
+            <FilterBtn active={filter === "hazardous"} onClick={() => setFilter("hazardous")}>
+              Hazardous ({allAsteroids.filter((a) => a.is_potentially_hazardous_asteroid).length})
+            </FilterBtn>
+          </div>
+          {/* sort */}
+          <NeoSortPanel sort={sort} onChange={setSort} />
+        </div>
+      )}
+
       {/* error */}
       {error && (
         <Alert variant="destructive">
@@ -154,31 +171,29 @@ export default function BrowsePage() {
           </div>
 
           {/* pagination */}
-          {(
-            <div className="flex items-center justify-between">
-              <p className="text-xs text-muted-foreground">
-                Page {currentPage+1} of {totalPages} — showing {paged.length} of {filtered.length}
-              </p>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={currentPage === 0}
-                  onClick={() => handleBrowse(currentPage-1)} //indietro una pag
-                >
-                  Previous
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={currentPage >= totalPages-1}
-                  onClick={() => handleBrowse(currentPage+1)} //avanti una pag
-                >
-                  Next
-                </Button>
-              </div>
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">
+              Page {currentPage + 1} of {totalPages} — showing {paged.length}
+            </p>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage === 0}
+                onClick={() => handleBrowse(currentPage - 1)} // indietro una pag
+              >
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage >= totalPages - 1}
+                onClick={() => handleBrowse(currentPage + 1)} // avanti una pag
+              >
+                Next
+              </Button>
             </div>
-          )}
+          </div>
         </div>
       )}
 
@@ -186,7 +201,9 @@ export default function BrowsePage() {
       {!loading && !data && !error && (
         <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border py-16 text-center">
           <List className="h-8 w-8 text-muted-foreground/50" />
-          <p className="text-sm text-muted-foreground">Press "Load all NEOs" to browse the database.</p>
+          <p className="text-sm text-muted-foreground">
+            Press "Load all NEOs" to browse the database.
+          </p>
         </div>
       )}
     </div>

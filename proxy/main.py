@@ -62,82 +62,54 @@ def chunk_date_range(start: str, end: str) -> list[tuple[str, str]]:
     chunk_size = 7
     current = date.fromisoformat(start)
     end_date = date.fromisoformat(end)
-
     while current <= end_date:
         chunk_end = min(current + timedelta(days=chunk_size - 1), end_date)
         chunks.append((current.isoformat(), chunk_end.isoformat()))
         current += timedelta(days=chunk_size)
-
     return chunks
 
 
-def get_cached_days(start: str, end: str) -> dict[str, list]:
-    """ controlla giorno per giorno quali sono già in cache e li ritorna """
+def get_cached_chunks(start: str, end: str) -> dict[str, dict]:
+    """ controlla chunk per chunk quali sono già in cache e li ritorna """
     cached = {}
-    current = date.fromisoformat(start)
-    end_date = date.fromisoformat(end)
-
-    while current <= end_date:
-        day_str = current.isoformat()
-        data = get_from_cache(f"f_{day_str}")
+    for chunk_start, chunk_end in chunk_date_range(start, end):
+        key = f"f_{chunk_start}_{chunk_end}"
+        data = get_from_cache(key)
         if data is not None:
-            cached[day_str] = data
-        current += timedelta(days=1)
-
+            cached[key] = data
     return cached
 
 
-def get_missing_chunks(start: str, end: str, cached_days: dict) -> list[tuple[str, str]]:
-    """ trova i giorni mancanti nella cache e li raggruppa in chunk da max 7 (cerca sempre di massimizzare le dimensioni dei chunk, cosi da minimizzare le richieste api),
-        rispettando i gap (giorni già cachati in mezzo al range) 
+def get_missing_chunks(start: str, end: str, cached_chunks: dict) -> list[tuple[str, str]]:
+    """ trova i chunk mancanti nella cache (cerca sempre di massimizzare le dimensioni dei chunk, cosi da minimizzare le richieste api),
+        rispettando i gap (chunk già cachati in mezzo al range)
         
         le richieste nasa vengono comunque mandate in chunk e non a giorni singoli
-        
+
         un risparmio vero di chiamate API avviene solo se si lavora su intervalli grandi, in modo che più settimane possano essere
         cached. infatti, da come si intende dal sito nasa, il consumo delle chiamate non dipende dalla "dimensione" ma solo dal numero
-        
-        """
+    """
     missing = []
-    current = date.fromisoformat(start)
-    end_date = date.fromisoformat(end)
-
-    while current <= end_date:
-        if current.isoformat() not in cached_days:
-            missing.append(current)
-        current += timedelta(days=1)
-
-    if not missing:
-        return []
-
-    # raggruppa solo giorni consecutivi in chunk da max 7
-    chunks = []
-    group_start = missing[0]
-    prev = missing[0]
-
-    for day in missing[1:]:
-        if (day - prev).days > 1:  # gap → chiudi il gruppo corrente
-            chunks += chunk_date_range(group_start.isoformat(), prev.isoformat())
-            group_start = day
-        prev = day
-
-    chunks += chunk_date_range(group_start.isoformat(), prev.isoformat())
-    return chunks
+    for chunk_start, chunk_end in chunk_date_range(start, end):
+        key = f"f_{chunk_start}_{chunk_end}"
+        if key not in cached_chunks:
+            missing.append((chunk_start, chunk_end))
+    return missing
 
 
 def neows_feed(start_date: str = None, end_date: str = None):
     """ formato data YYYY-MM-DD per start_date e end_date """
-
     #  se l'utente non ha inserito alcuna data di ricerca, il ? dopo feed nella costante FEED_ADDON
     #  non causa problematiche nella chiamata API
     if not (start_date and end_date):
         url = NEOWS_URL_BASE + FEED_ADDON + "&" + API_KEY_ADDON
         return json.loads(r.get(url).content)
 
-    # controlla quali giorni sono già in cache
-    cached_days = get_cached_days(start_date, end_date)
+    # controlla quali chunk sono già in cache
+    cached_chunks = get_cached_chunks(start_date, end_date)
 
-    # trova i chunk di giorni mancanti (rispetta i gap)
-    missing_chunks = get_missing_chunks(start_date, end_date, cached_days)
+    # trova i chunk mancanti (rispetta i gap)
+    missing_chunks = get_missing_chunks(start_date, end_date, cached_chunks)
 
     # fetch da NASA solo i chunk mancanti
     for chunk_start, chunk_end in missing_chunks:
@@ -145,13 +117,17 @@ def neows_feed(start_date: str = None, end_date: str = None):
         url += f"start_date={chunk_start}&end_date={chunk_end}&{API_KEY_ADDON}"
         data_feed = json.loads(r.get(url).content)
 
-        # salva ogni giorno singolarmente in cache
-        for day, asteroids in data_feed.get("near_earth_objects", {}).items():
-            set_in_cache(f"f_{day}", asteroids)
-            cached_days[day] = asteroids  # aggiorna il dict locale
+        # salva il chunk intero in cache
+        key = f"f_{chunk_start}_{chunk_end}"
+        set_in_cache(key, data_feed)
+        cached_chunks[key] = data_feed  # aggiorna il dict locale
 
-    #  merge di tutti i giorni nel range richiesto, ordinati per data
-    merged = dict(sorted(cached_days.items()))
+    # merge di tutti i giorni nel range richiesto, ordinati per data
+    merged = {}
+    for chunk_data in cached_chunks.values():
+        merged.update(chunk_data.get("near_earth_objects", {}))
+
+    merged = dict(sorted(merged.items()))
     return {
         "near_earth_objects": merged,
         "element_count": sum(len(v) for v in merged.values())
