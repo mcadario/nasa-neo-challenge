@@ -12,6 +12,8 @@ import { getLookup } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
 import type { Asteroid } from "@/lib/types";
 import { useSearchParams } from "next/navigation";
+import type { CloseApproach } from "@/lib/types";
+import { FilterBtn } from "@/components/filter-btn";
 
 
 const EXAMPLE_IDS = ["3542519", "2465633", "54016034", "3758838"];
@@ -123,6 +125,14 @@ export default function LookupPage() {
 
 function AsteroidDetail({ asteroid }: { asteroid: Asteroid }) {
   const isHazardous = asteroid.is_potentially_hazardous_asteroid;
+  const [approachView, setApproachView] = useState<"future" | "past">("future");
+
+  const now = Date.now();
+  const sorted = asteroid.close_approach_data
+    .slice()
+    .sort((a, b) => b.epoch_date_close_approach - a.epoch_date_close_approach);
+  const future = sorted.filter((ca) => ca.epoch_date_close_approach > now);
+  const past = sorted.filter((ca) => ca.epoch_date_close_approach <= now);
 
   return (
     <div className="space-y-4 animate-fade-in">
@@ -194,43 +204,27 @@ function AsteroidDetail({ asteroid }: { asteroid: Asteroid }) {
       {/* close approaches */}
       {asteroid.close_approach_data.length > 0 && (
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground font-medium uppercase tracking-wide">
-              Close approaches ({asteroid.close_approach_data.length})
-            </CardTitle>
+          <CardHeader className="pb-2"> 
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm text-muted-foreground font-medium uppercase tracking-wide">
+                Close approaches ({asteroid.close_approach_data.length})
+              </CardTitle>
+              <div className="flex items-center gap-1 rounded-md border border-border p-1">
+                <FilterBtn active={approachView === "future"} onClick={() => setApproachView("future")}>
+                  Future ({future.length})
+                </FilterBtn>
+                <FilterBtn active={approachView === "past"} onClick={() => setApproachView("past")}>
+                  Past ({past.length})
+                </FilterBtn>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs font-mono">
-                <thead>
-                  <tr className="border-b border-border text-muted-foreground">
-                    <th className="text-left pb-2 pr-4 font-medium">Date</th>
-                    <th className="text-right pb-2 pr-4 font-medium">Velocity (km/s)</th>
-                    <th className="text-right pb-2 pr-4 font-medium">Miss dist. (LD)</th>
-                    <th className="text-right pb-2 font-medium">Body</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {asteroid.close_approach_data.slice(0, 10).map((ca, i) => (
-                    <tr key={i} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
-                      <td className="py-1.5 pr-4 text-foreground">{ca.close_approach_date}</td>
-                      <td className="py-1.5 pr-4 text-right">
-                        {parseFloat(ca.relative_velocity.kilometers_per_second).toFixed(2)}
-                      </td>
-                      <td className="py-1.5 pr-4 text-right">
-                        {parseFloat(ca.miss_distance.lunar).toFixed(1)}
-                      </td>
-                      <td className="py-1.5 text-right text-muted-foreground">{ca.orbiting_body}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {asteroid.close_approach_data.length > 10 && (
-                <p className="mt-2 text-xs text-muted-foreground">
-                  Showing 10 of {asteroid.close_approach_data.length} approaches.
-                </p>
-              )}
-            </div>
+            <ApproachTable
+              title=""
+              approaches={approachView === "future" ? future : past.slice(0, 10)}
+              total={approachView === "past" ? past.length : undefined}
+            />
           </CardContent>
         </Card>
       )}
@@ -243,6 +237,51 @@ function Row({ label, value, mono }: { label: string; value: string; mono?: bool
     <div className="flex items-baseline justify-between gap-4 border-b border-border/40 pb-1 last:border-0">
       <span className="text-xs text-muted-foreground shrink-0">{label}</span>
       <span className={`text-sm text-right ${mono ? "font-mono" : ""}`}>{value}</span>
+    </div>
+  );
+}
+
+function ApproachTable({ title, approaches, total }: {
+  title: string;
+  approaches: CloseApproach[];
+  total?: number;
+}) {
+  return (
+    <div>
+      <p className="text-xs font-semibold uppercase tracking-wide mb-2 text-muted-foreground">
+        {title} ({total ?? approaches.length})
+      </p>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs font-mono">
+          <thead>
+            <tr className="border-b border-border text-muted-foreground">
+              <th className="text-left pb-2 pr-4 font-medium">Date</th>
+              <th className="text-right pb-2 pr-4 font-medium">Velocity (km/s)</th>
+              <th className="text-right pb-2 pr-4 font-medium">Miss dist. (LD)</th>
+              <th className="text-right pb-2 font-medium">Body</th>
+            </tr>
+          </thead>
+          <tbody>
+            {approaches.map((ca, i) => (
+              <tr key={i} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                <td className="py-1.5 pr-4 text-foreground">{ca.close_approach_date}</td>
+                <td className="py-1.5 pr-4 text-right">
+                  {parseFloat(ca.relative_velocity.kilometers_per_second).toFixed(2)}
+                </td>
+                <td className="py-1.5 pr-4 text-right">
+                  {parseFloat(ca.miss_distance.lunar).toFixed(1)}
+                </td>
+                <td className="py-1.5 text-right text-muted-foreground">{ca.orbiting_body}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {total && total > approaches.length && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            Showing {approaches.length} of {total}.
+          </p>
+        )}
+      </div>
     </div>
   );
 }

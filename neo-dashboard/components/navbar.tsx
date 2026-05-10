@@ -19,7 +19,7 @@ export function Navbar() {
       <div className="container flex h-14 items-center gap-6">
         <Link href="/feed" className="flex items-center gap-2 font-semibold text-primary">
           <Orbit className="h-5 w-5" />
-          <span className="hidden sm:inline">NeoWs Dashboard</span>
+          <span className="hidden sm:inline">NASA NEO Dashboard</span>
         </Link>
 
         <nav className="flex items-center gap-1">
@@ -38,14 +38,6 @@ export function Navbar() {
             </Link>
           ))}
         </nav>
-
-        <div className="ml-auto flex items-center gap-2 text-xs text-muted-foreground font-mono">
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
-          </span>
-          {process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}
-        </div>
       </div>
     </header>
   );
