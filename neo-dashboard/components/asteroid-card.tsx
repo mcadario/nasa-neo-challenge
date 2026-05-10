@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import type { Asteroid } from "@/lib/types";
 import { formatNumber } from "@/lib/utils";
+import { useRouter } from "next/navigation";
 
 interface AsteroidCardProps {
   asteroid: Asteroid;
@@ -14,8 +15,11 @@ export function AsteroidCard({ asteroid }: AsteroidCardProps) {
   const diamMax = asteroid.estimated_diameter.meters.estimated_diameter_max;
   const isHazardous = asteroid.is_potentially_hazardous_asteroid;
 
+  const router = useRouter();
+
   return (
     <Card
+      onClick={() => router.push(`/lookup?id=${asteroid.id}`)}
       className={`animate-fade-in transition-colors hover:border-primary/40 ${
         isHazardous ? "border-destructive/30" : ""
       }`}

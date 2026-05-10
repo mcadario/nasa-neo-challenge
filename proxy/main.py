@@ -33,9 +33,11 @@ logger = logging.getLogger(__name__)
 
 #caching helpers
 """ formato key:
-        feed: f_YYYY-MM-DD_YYYY-MM-DD, geenrata solo se le date sono impostate
+        feed: f_YYYY-MM-DD, generata solo se le date sono impostate
         lookup: l_0000000, 000000 è l'id asteroide
         browse: b_0, 0 rappresenta il numero di pagina
+
+per ottimizzare il caching si potrebbe creare una cache per ogni
 """
 
 def get_from_cache(key: str) -> dict | None:
@@ -53,7 +55,9 @@ def set_in_cache(key: str, data: dict) -> None:
 
 #helper per dividere date in intervalli da 7 giorni
 # output: [["2026-01-01","2026-01-07"], ["2026-01-08","2026-01-14"], ["2026-01-15","2026-01-20"]]
+
 def chunk_date_range(start: str, end: str) -> list[tuple[str, str]]:
+    """ spezza un range in chunk da max 7 giorni """
     chunks = []
     chunk_size = 7
     current = date.fromisoformat(start)
@@ -67,36 +71,91 @@ def chunk_date_range(start: str, end: str) -> list[tuple[str, str]]:
     return chunks
 
 
-def neows_feed(start_date:str = None, end_date:str = None):
+def get_cached_days(start: str, end: str) -> dict[str, list]:
+    """ controlla giorno per giorno quali sono già in cache e li ritorna """
+    cached = {}
+    current = date.fromisoformat(start)
+    end_date = date.fromisoformat(end)
+
+    while current <= end_date:
+        day_str = current.isoformat()
+        data = get_from_cache(f"f_{day_str}")
+        if data is not None:
+            cached[day_str] = data
+        current += timedelta(days=1)
+
+    return cached
+
+
+def get_missing_chunks(start: str, end: str, cached_days: dict) -> list[tuple[str, str]]:
+    """ trova i giorni mancanti nella cache e li raggruppa in chunk da max 7 (cerca sempre di massimizzare le dimensioni dei chunk, cosi da minimizzare le richieste api),
+        rispettando i gap (giorni già cachati in mezzo al range) 
+        
+        le richieste nasa vengono comunque mandate in chunk e non a giorni singoli
+        
+        un risparmio vero di chiamate API avviene solo se si lavora su intervalli grandi, in modo che più settimane possano essere
+        cached. infatti, da come si intende dal sito nasa, il consumo delle chiamate non dipende dalla "dimensione" ma solo dal numero
+        
+        """
+    missing = []
+    current = date.fromisoformat(start)
+    end_date = date.fromisoformat(end)
+
+    while current <= end_date:
+        if current.isoformat() not in cached_days:
+            missing.append(current)
+        current += timedelta(days=1)
+
+    if not missing:
+        return []
+
+    # raggruppa solo giorni consecutivi in chunk da max 7
+    chunks = []
+    group_start = missing[0]
+    prev = missing[0]
+
+    for day in missing[1:]:
+        if (day - prev).days > 1:  # gap → chiudi il gruppo corrente
+            chunks += chunk_date_range(group_start.isoformat(), prev.isoformat())
+            group_start = day
+        prev = day
+
+    chunks += chunk_date_range(group_start.isoformat(), prev.isoformat())
+    return chunks
+
+
+def neows_feed(start_date: str = None, end_date: str = None):
     """ formato data YYYY-MM-DD per start_date e end_date """
 
-    chunks:list = chunk_date_range(start_date,end_date)
-    merged = {}
+    #  se l'utente non ha inserito alcuna data di ricerca, il ? dopo feed nella costante FEED_ADDON
+    #  non causa problematiche nella chiamata API
+    if not (start_date and end_date):
+        url = NEOWS_URL_BASE + FEED_ADDON + "&" + API_KEY_ADDON
+        return json.loads(r.get(url).content)
 
-    for s,e in chunks: # s: start_date, e: end_date
+    # controlla quali giorni sono già in cache
+    cached_days = get_cached_days(start_date, end_date)
+
+    # trova i chunk di giorni mancanti (rispetta i gap)
+    missing_chunks = get_missing_chunks(start_date, end_date, cached_days)
+
+    # fetch da NASA solo i chunk mancanti
+    for chunk_start, chunk_end in missing_chunks:
         url = NEOWS_URL_BASE + FEED_ADDON
-        key = None
-        if (s and e): # se date di ricerca sono presenti
-            url += f"start_date={s}&end_date={e}"
-            key = f"f_{s}_{e}"
-        
-        #  se l'utente non ha inserito alcuna data di ricerca, il ? dopo feed nella costante FEED_ADDON
-        #  non causa problematiche nella chiamata API, la cache non verrà sfruttata  
-
-        url += "&"+API_KEY_ADDON
-
-        if key: # se la key non è None, allora è stata impostata con le date corrette
-            cache_response = get_from_cache(key)
-            if cache_response:
-                merged.update(cache_response.get("near_earth_objects", {}))
-                continue
-        
-        # key non è presente nella cache
+        url += f"start_date={chunk_start}&end_date={chunk_end}&{API_KEY_ADDON}"
         data_feed = json.loads(r.get(url).content)
-        set_in_cache(key, data_feed)
-        merged.update(data_feed.get("near_earth_objects", {}))
 
-    return {"near_earth_objects": merged, "element_count": sum(len(v) for v in merged.values())}
+        # salva ogni giorno singolarmente in cache
+        for day, asteroids in data_feed.get("near_earth_objects", {}).items():
+            set_in_cache(f"f_{day}", asteroids)
+            cached_days[day] = asteroids  # aggiorna il dict locale
+
+    #  merge di tutti i giorni nel range richiesto, ordinati per data
+    merged = dict(sorted(cached_days.items()))
+    return {
+        "near_earth_objects": merged,
+        "element_count": sum(len(v) for v in merged.values())
+    }
     
 
 def neows_lookup(asteroid_id:int = None):
