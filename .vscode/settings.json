@@ -1,4 +1,6 @@
 {
-    "python-envs.defaultEnvManager": "ms-python.python:conda",
-    "python-envs.defaultPackageManager": "ms-python.python:conda"
+  "python.defaultInterpreterPath": "/home/mic/.local/share/mamba/envs/ak-nasa-neows/bin/python",
+  "python.condaPath": "/home/mic/anaconda3/bin/mamba",
+  "python-envs.defaultEnvManager": "ms-python.python:conda",
+  "python-envs.defaultPackageManager": "ms-python.python:conda"
 }
