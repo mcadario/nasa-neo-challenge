@@ -8,6 +8,7 @@ import redis
 import json
 import logging
 from datetime import date, timedelta
+from fastapi.responses import StreamingResponse
 
 ENV_PATH = "../.env"
 load_dotenv(dotenv_path=ENV_PATH)
@@ -95,6 +96,19 @@ def get_missing_chunks(start: str, end: str, cached_chunks: dict) -> list[tuple[
         if key not in cached_chunks:
             missing.append((chunk_start, chunk_end))
     return missing
+
+def merge_feed_chunks(chunks: list[dict]) -> dict:
+    merged = {}
+
+    for chunk_data in chunks:
+        merged.update(chunk_data.get("near_earth_objects", {}))
+
+    merged = dict(sorted(merged.items()))
+
+    return {
+        "near_earth_objects": merged,
+        "element_count": sum(len(v) for v in merged.values())
+    }
 
 
 def neows_feed(start_date: str = None, end_date: str = None):
@@ -187,3 +201,52 @@ async def lookup(a_id: int = None):
 @app.get("/browse/") # example: http://localhost:8000/browse/?page=1
 async def browse(page: int = 10):
     return neows_browse(page)
+
+
+# stream
+@app.get("/feed/stream/")
+async def feed_stream(sdate: str = None, edate: str = None):
+    def generate():
+        chunks = chunk_date_range(sdate, edate)
+        total = len(chunks)
+        collected_chunks = []
+
+        for index, (chunk_start, chunk_end) in enumerate(chunks, start=1):
+            key = f"f_{chunk_start}_{chunk_end}"
+
+            cached = get_from_cache(key)
+
+            if cached is not None:
+                data_feed = cached
+                source = "cache"
+            else:
+                url = NEOWS_URL_BASE + FEED_ADDON
+                url += f"start_date={chunk_start}&end_date={chunk_end}&{API_KEY_ADDON}"
+
+                data_feed = json.loads(r.get(url).content)
+                set_in_cache(key, data_feed)
+                source = "nasa"
+
+            collected_chunks.append(data_feed)
+
+            yield json.dumps({
+                "type": "progress",
+                "current": index,
+                "total": total,
+                "key": key,
+                "source": source,
+                "chunk_start": chunk_start,
+                "chunk_end": chunk_end,
+            }) + "\n"
+
+        final_data = merge_feed_chunks(collected_chunks)
+
+        yield json.dumps({
+            "type": "done",
+            "data": final_data,
+        }) + "\n"
+
+    return StreamingResponse(
+        generate(),
+        media_type="application/x-ndjson"
+    )

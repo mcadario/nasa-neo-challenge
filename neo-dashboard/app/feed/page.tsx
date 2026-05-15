@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { format, subDays } from "date-fns";
 import { Search, Calendar, AlertCircle, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AsteroidCard } from "@/components/asteroid-card";
 import { getFeed } from "@/lib/api";
+import { getFeedStream } from "@/lib/api";
 import type { Asteroid, FeedResponse } from "@/lib/types";
 import { FilterBtn } from "@/components/filter-btn";
 import { NeoSortPanel, DEFAULT_SORT, type SortState } from "@/components/neo-sort";
@@ -37,6 +38,12 @@ export default function FeedPage() {
   const [filter, setFilter] = useState<"all" | "hazardous" | "safe">("all");
   const [sort, setSort] = useState<SortState>(DEFAULT_SORT);
   const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  function stopFetch() {
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
+  }
 
   async function handleFetch() {
     setError(null);
@@ -45,19 +52,41 @@ export default function FeedPage() {
       return;
     }
 
-    const days = (new Date(endDate).getTime() - new Date(startDate).getTime()) / 86400000;
+    const days =
+      (new Date(endDate).getTime() - new Date(startDate).getTime()) / 86400000 + 1;
+
     const totalChunks = Math.ceil(days / 7);
 
     setLoading(true);
     setProgress({ current: 0, total: totalChunks });
 
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
-      const res = await getFeed(startDate, endDate);
+      const res = await getFeedStream(
+        startDate,
+        endDate,
+        (p) => {
+          setProgress({
+            current: p.current,
+            total: p.total,
+          });
+
+          setSource(p.source);
+        },
+        controller.signal
+      );
+
       setData(res);
-      setSource((res as any).source ?? null);
     } catch (e: any) {
+      if (e.name === "AbortError") {
+        return;
+      }
+
       setError(e.message);
     } finally {
+      abortControllerRef.current = null;
       setLoading(false);
       setProgress(null);
     }
@@ -135,9 +164,13 @@ export default function FeedPage() {
             className="w-44 font-mono"
           />
         </div>
-        <Button onClick={handleFetch} disabled={loading} className="gap-2">
+        <Button
+          onClick={loading ? stopFetch : handleFetch}
+          variant={loading ? "destructive" : "default"}
+          className="gap-2"
+        >
           <Search className="h-4 w-4" />
-          {loading ? "Fetching…" : "Search"}
+          {loading ? "Stop" : "Search"}
         </Button>
       </div>
 
@@ -189,7 +222,7 @@ export default function FeedPage() {
           {progress && progress.total > 1 && (
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground font-mono text-center">
-                Fetching {progress.total} chunks from NASA…
+                Fetching {progress.current} of {progress.total} chunks from NASA…
               </p>
               <div className="w-full bg-border rounded-full h-1">
                 <div
