@@ -1,12 +1,16 @@
 /** @type {import('next').NextConfig} */
+const repoName = "nasa-neo-challenge";
+const isGithubPages = process.env.GITHUB_PAGES === "true";
+
 const nextConfig = {
-  async rewrites() {
-    return [
-      {
-        source: "/api/:path*",
-        destination: `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/:path*`,
-      },
-    ];
+  output: "export",
+  trailingSlash: true,
+
+  basePath: isGithubPages ? `/${repoName}` : "",
+  assetPrefix: isGithubPages ? `/${repoName}/` : "",
+
+  images: {
+    unoptimized: true,
   },
 };
 
