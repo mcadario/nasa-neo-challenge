@@ -95,7 +95,13 @@ function DistanceChart({ approaches }: { approaches: CloseApproach[] }) {
               <CartesianGrid {...CHART_STYLE.cartesianGrid} />
               <XAxis dataKey="date" tick={{ fontSize: 9, fill: "#6b7280" }} tickLine={false} interval="preserveStartEnd" />
               <YAxis tick={{ fontSize: 9, fill: "#6b7280" }} tickLine={false} axisLine={false} width={35} />
-              <Tooltip {...CHART_STYLE.tooltip} formatter={(v: number) => [`${v} LD`, "Distance"]} />
+              <Tooltip
+                  {...CHART_STYLE.tooltip}
+                  formatter={(value) => {
+                    const n = Number(value ?? 0);
+                    return [`${n.toFixed(1)} LD`, "Distance"];
+                  }}
+                />
               <ReferenceLine y={1} stroke="rgba(239,68,68,0.4)" strokeDasharray="4 4" label={{ value: "Moon orbit", fill: "#ef4444", fontSize: 9 }} />
               <Area type="monotone" dataKey="distance" stroke="#63d2ff" strokeWidth={2} fill="url(#distGrad)" dot={false} />
             </AreaChart>
@@ -121,7 +127,13 @@ function DistanceChart({ approaches }: { approaches: CloseApproach[] }) {
               <CartesianGrid {...CHART_STYLE.cartesianGrid} />
               <XAxis dataKey="date" tick={{ fontSize: 9, fill: "#6b7280" }} tickLine={false} interval="preserveStartEnd" />
               <YAxis tick={{ fontSize: 9, fill: "#6b7280" }} tickLine={false} axisLine={false} width={35} />
-              <Tooltip {...CHART_STYLE.tooltip} formatter={(v: number) => [`${v} km/s`, "Velocity"]} />
+              <Tooltip
+                  {...CHART_STYLE.tooltip}
+                  formatter={(value) => {
+                    const n = Number(value ?? 0);
+                    return [`${n.toFixed(2)} km/s`, "Velocity"];
+                  }}
+                />
               <Area type="monotone" dataKey="velocity" stroke="#f59e0b" strokeWidth={2} fill="url(#velGrad)" dot={false} />
             </AreaChart>
           </ResponsiveContainer>
