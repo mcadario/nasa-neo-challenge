@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useState, useEffect, useRef } from "react";
+import { Suspense, useState, useEffect, useRef } from "react";
 import { Search, AlertCircle, ExternalLink, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -374,7 +374,7 @@ function StatLine({ label, value }: { label: string; value: string }) {
 }
 
 
-export default function LookupPage() {
+function LookupPageContent() {
   const [asteroidId, setAsteroidId] = useState("");
   const [data, setData] = useState<Asteroid | null>(null);
   const [loading, setLoading] = useState(false);
@@ -478,6 +478,28 @@ export default function LookupPage() {
           <p className="text-sm text-muted-foreground">Enter an asteroid ID to see details.</p>
         </div>
       )}
+    </div>
+  );
+}
+
+export default function LookupPage() {
+  return (
+    <Suspense fallback={<LookupFallback />}>
+      <LookupPageContent />
+    </Suspense>
+  );
+}
+
+function LookupFallback() {
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Asteroid Lookup</h1>
+        <p className="text-muted-foreground mt-1">
+          Loading lookup page…
+        </p>
+      </div>
+      <Skeleton className="h-28 w-full rounded-lg" />
     </div>
   );
 }
