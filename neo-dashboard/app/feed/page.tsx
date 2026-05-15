@@ -36,6 +36,7 @@ export default function FeedPage() {
   const [source, setSource] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "hazardous" | "safe">("all");
   const [sort, setSort] = useState<SortState>(DEFAULT_SORT);
+  const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
 
   async function handleFetch() {
     setError(null);
@@ -43,7 +44,13 @@ export default function FeedPage() {
       setError("Controllare correttezza ordine tra prima e seconda data.");
       return;
     }
+
+    const days = (new Date(endDate).getTime() - new Date(startDate).getTime()) / 86400000;
+    const totalChunks = Math.ceil(days / 7);
+
     setLoading(true);
+    setProgress({ current: 0, total: totalChunks });
+
     try {
       const res = await getFeed(startDate, endDate);
       setData(res);
@@ -52,6 +59,7 @@ export default function FeedPage() {
       setError(e.message);
     } finally {
       setLoading(false);
+      setProgress(null);
     }
   }
 
@@ -176,8 +184,24 @@ export default function FeedPage() {
         </Alert>
       )}
 
-      {/* loading */}
-      {loading && <SkeletonGrid />}
+      {loading && (
+        <>
+          {progress && progress.total > 1 && (
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground font-mono text-center">
+                Fetching {progress.total} chunks from NASA…
+              </p>
+              <div className="w-full bg-border rounded-full h-1">
+                <div
+                  className="bg-primary h-1 rounded-full transition-all"
+                  style={{ width: `${(progress.current / progress.total) * 100}%` }}
+                />
+              </div>
+            </div>
+          )}
+          <SkeletonGrid />
+        </>
+      )}
 
       {/* results */}
       {!loading && data && (
@@ -228,6 +252,15 @@ export default function FeedPage() {
           <p className="text-sm text-muted-foreground">
             Select a date range and press Search.
           </p>
+        </div>
+      )}
+
+      {/* empty range */}
+      {dateEntries.length === 0 && !loading && data && (
+        <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border py-12 text-center">
+          <Search className="h-8 w-8 text-muted-foreground/50" />
+          <p className="text-sm text-muted-foreground">No asteroids found for this date range.</p>
+          <p className="text-xs text-muted-foreground">Try a different range or remove filters.</p>
         </div>
       )}
     </div>

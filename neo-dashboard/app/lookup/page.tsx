@@ -14,14 +14,12 @@ import { formatNumber } from "@/lib/utils";
 import type { Asteroid, CloseApproach } from "@/lib/types";
 import { useSearchParams } from "next/navigation";
 import { FilterBtn } from "@/components/filter-btn";
-import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, AreaChart, Area, ScatterChart, Scatter, ReferenceLine,
+import { 
+  XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, AreaChart, Area, ReferenceLine,
 } from "recharts";
 
 const EXAMPLE_IDS = ["3542519", "2465633", "54016034", "3758838"];
-
-// ── Countdown ─────────────────────────────────────────────────────────────────
 
 function Countdown({ target }: { target: number }) {
   const [remaining, setRemaining] = useState(target - Date.now());
@@ -58,8 +56,6 @@ function Countdown({ target }: { target: number }) {
     </div>
   );
 }
-
-// ── Charts ────────────────────────────────────────────────────────────────────
 
 const CHART_STYLE = {
   cartesianGrid: { strokeDasharray: "3 3", stroke: "rgba(255,255,255,0.05)" },
@@ -135,7 +131,6 @@ function DistanceChart({ approaches }: { approaches: CloseApproach[] }) {
   );
 }
 
-// ── ApproachTable ─────────────────────────────────────────────────────────────
 
 function ApproachTable({ approaches, total }: { approaches: CloseApproach[]; total?: number }) {
   return (
@@ -167,8 +162,6 @@ function ApproachTable({ approaches, total }: { approaches: CloseApproach[]; tot
   );
 }
 
-// ── Row ───────────────────────────────────────────────────────────────────────
-
 function Row({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
     <div className="flex items-baseline justify-between gap-4 border-b border-border/40 pb-1 last:border-0">
@@ -178,7 +171,6 @@ function Row({ label, value, mono }: { label: string; value: string; mono?: bool
   );
 }
 
-// ── AsteroidDetail ────────────────────────────────────────────────────────────
 
 function AsteroidDetail({ asteroid }: { asteroid: Asteroid }) {
   const isHazardous = asteroid.is_potentially_hazardous_asteroid;
@@ -190,7 +182,7 @@ function AsteroidDetail({ asteroid }: { asteroid: Asteroid }) {
     .sort((a, b) => b.epoch_date_close_approach - a.epoch_date_close_approach);
   const future = sorted.filter((ca) => ca.epoch_date_close_approach > now);
   const past = sorted.filter((ca) => ca.epoch_date_close_approach <= now);
-  const nextApproach = future[future.length - 1]; // earliest future
+  const nextApproach = future[future.length - 1];
 
   const avgDiameter = (
     asteroid.estimated_diameter.meters.estimated_diameter_min +
@@ -350,7 +342,7 @@ function AsteroidDetail({ asteroid }: { asteroid: Asteroid }) {
           </CardHeader>
           <CardContent>
             <ApproachTable
-              approaches={approachView === "future" ? future : past.slice(0, 10)}
+              approaches={approachView === "future" ? future : past}
               total={approachView === "past" ? past.length : undefined}
             />
           </CardContent>
@@ -369,7 +361,6 @@ function StatLine({ label, value }: { label: string; value: string }) {
   );
 }
 
-// ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function LookupPage() {
   const [asteroidId, setAsteroidId] = useState("");

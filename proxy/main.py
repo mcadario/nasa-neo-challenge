@@ -163,10 +163,12 @@ def neows_browse(page:int = 0): #https://api.nasa.gov/neo/rest/v1/neo/browse?api
 ########### ENDPOINTS ###########
 app = FastAPI()
 
+origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
+    allow_origins=origins,
+    allow_methods=["GET"], #solo operazioni GET (POST potrebbe modificare db)
     allow_headers=["*"],
 )
 
