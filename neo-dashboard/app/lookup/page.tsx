@@ -20,6 +20,7 @@ import {
 } from "recharts";
 
 const EXAMPLE_IDS = ["3542519", "2465633", "54016034", "3758838"];
+const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 
 function Countdown({ target }: { target: number }) {
   const [remaining, setRemaining] = useState(target - Date.now());
@@ -251,11 +252,10 @@ function AsteroidDetail({ asteroid }: { asteroid: Asteroid }) {
               <div className="w-44 h-44">
                 <div className="w-44 h-44 flex flex-col items-center justify-center">
                   <Image
-                    src="/asteroid.png"
+                    src={`${BASE_PATH}/asteroid.png`}
                     alt="asteroid"
                     width={160}
                     height={160}
-                    className={`drop-shadow-lg ${isHazardous ? "hue-rotate-[320deg] saturate-150" : ""}`}
                   />
                   <p className="text-xs font-mono text-primary mt-1">
                     {avgDiameter >= 1000
